@@ -1,0 +1,29 @@
+# ── Dataset ────────────────────────────────────────────────────────
+datasets>=2.20.0
+huggingface-hub>=0.23.0
+
+# ── BM25 ───────────────────────────────────────────────────────────
+rank-bm25>=0.2.2
+underthesea>=6.8.4          # Vietnamese word tokenizer
+
+# ── Dense retrieval ────────────────────────────────────────────────
+sentence-transformers>=3.1.0
+faiss-cpu>=1.8.0
+
+# ── LLM generation ─────────────────────────────────────────────────
+torch>=2.3.0
+transformers>=4.43.0
+bitsandbytes>=0.43.0        # 4-bit quantization
+accelerate>=0.31.0
+
+# ── Evaluation ─────────────────────────────────────────────────────
+rouge-score>=0.1.2
+bert-score>=0.3.13
+
+# ── Utilities ──────────────────────────────────────────────────────
+numpy>=1.26.0
+pandas>=2.2.0
+tqdm>=4.66.0
+jsonlines>=4.0.0
+loguru>=0.7.2
+python-dotenv>=1.0.0

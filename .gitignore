@@ -1,0 +1,49 @@
+# ── Python ────────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ── Data (large, reproducible) ────────────────────────────────────
+data/raw/
+
+# ── Indexes (large binary, reproducible) ──────────────────────────
+indexes/
+*.faiss
+*.npy
+*.pkl
+
+# ── Model weights (very large) ────────────────────────────────────
+models/
+*.bin
+*.safetensors
+*.gguf
+
+# ── HuggingFace cache ─────────────────────────────────────────────
+.cache/
+
+# ── Per-question result files (large, regenerable) ────────────────
+results/*_results.jsonl
+
+# ── BUT keep metric summaries ─────────────────────────────────────
+!results/*_metrics.json
+!results/*_error_analysis.json
+
+# ── Notebooks output ──────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Environment & secrets ─────────────────────────────────────────
+.env
+*.log
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Markdown / Docs ───────────────────────────────────────────────
+*.md
+!README.md
