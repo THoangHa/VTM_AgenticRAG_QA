@@ -46,4 +46,4 @@ Thumbs.db
 
 # ── Markdown / Docs ───────────────────────────────────────────────
 *.md
-!README.md
+docs/
