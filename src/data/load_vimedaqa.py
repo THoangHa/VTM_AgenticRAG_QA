@@ -23,7 +23,8 @@ from loguru import logger
 
 DATASET_ID = "tmnam20/ViMedAQA"
 CONFIG     = "all"   # loads all 4 topics in one DatasetDict
-RAW_DATA_DIR = Path("data/raw/vimedaqa")
+ROOT = Path(__file__).resolve().parents[2]
+RAW_DATA_DIR = ROOT / "data" / "raw" / "vimedaqa"
 
 
 def load_vimedaqa(dataset_id: str = DATASET_ID, save_dir: Path | str = RAW_DATA_DIR) -> DatasetDict:
@@ -55,7 +56,7 @@ def load_vimedaqa(dataset_id: str = DATASET_ID, save_dir: Path | str = RAW_DATA_
         ds = load_from_disk(str(save_path))
     else:
         logger.info(f"Loading '{dataset_id}' from HuggingFace Hub …")
-        ds = load_dataset(dataset_id, CONFIG, trust_remote_code=True)
+        ds = load_dataset(dataset_id, CONFIG)
         
         logger.info(f"Saving raw dataset to {save_path} …")
         save_path.parent.mkdir(parents=True, exist_ok=True)

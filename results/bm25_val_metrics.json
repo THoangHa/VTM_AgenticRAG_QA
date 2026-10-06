@@ -1,0 +1,33 @@
+{
+  "split": "val",
+  "top_k": 10,
+  "query_count": 693,
+  "metrics": {
+    "Recall@1": 0.39826839826839827,
+    "Precision@1": 0.39826839826839827,
+    "Recall@5": 0.5757575757575758,
+    "Precision@5": 0.115151515151516,
+    "Recall@10": 0.6507936507936508,
+    "Precision@10": 0.06507936507936561,
+    "MRR@10": 0.4763307679974347
+  },
+  "schema_version": 1,
+  "corpus_fingerprint": "241deefc1bf2c14c787c55e29d7b7d5dbb11647450ff47924611ea6fc296a8f2",
+  "configuration": {
+    "k1": 1.5,
+    "b": 0.75,
+    "tokenizer": {
+      "name": "underthesea.word_tokenize",
+      "format": "text",
+      "lowercase": true,
+      "remove_punctuation": false,
+      "remove_stopwords": false
+    }
+  },
+  "dependency_versions": {
+    "rank-bm25": "0.2.2",
+    "underthesea": "9.5.0",
+    "underthesea_core": "3.3.2",
+    "numpy": "2.5.3"
+  }
+}
