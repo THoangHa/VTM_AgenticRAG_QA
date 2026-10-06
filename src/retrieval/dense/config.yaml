@@ -1,0 +1,30 @@
+# Dense retriever configuration.
+# Each key under `models` matches MODEL_KEY of a retriever subclass
+# (BGEM3Retriever -> bge_m3, ViBiEncoderRetriever -> vi_bi_encoder).
+# Preprocessing (e.g. word segmentation) is decided by the subclass `_prep`, not here.
+# Relative paths are resolved against this file's folder.
+
+paths:
+  corpus: ../../../data/processed/corpus.jsonl
+  data_dir: ../../../data/processed # val_qas / test_qas / qrels_*.json
+  index_root: ../../../indexes # index dir = {index_root}/dense_{MODEL_KEY}
+  results_dir: ../../../results
+
+defaults:
+  device: cuda
+  fp16: true # call model.half() on CUDA
+  batch_size: 32
+  top_k: 10
+
+models:
+  bge_m3:
+    hf_name: BAAI/bge-m3
+    max_seq_length: 512
+    dim: 1024
+    batch_size: 32 # optional per-model override of defaults.batch_size
+
+  vi_bi_encoder:
+    hf_name: bkai-foundation-models/vietnamese-bi-encoder
+    max_seq_length: 256
+    dim: 768
+    batch_size: 64
