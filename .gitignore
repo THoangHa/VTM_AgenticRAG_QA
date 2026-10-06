@@ -9,7 +9,7 @@ build/
 .pytest_cache/
 
 # ── Data (large, reproducible) ────────────────────────────────────
-data/
+data/raw/
 
 # ── Indexes (large binary, reproducible) ──────────────────────────
 indexes/
@@ -47,4 +47,7 @@ Thumbs.db
 # ── Markdown / Docs ───────────────────────────────────────────────
 *.md
 docs/
+data/processed/
 
+# Keep the BM25 usage guide
+!BM25_BASELINE.md
