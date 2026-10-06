@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "model": "bm25",
+  "split": "val",
+  "data_directory": "C:\\Users\\Admin\\OneDrive\\Documents\\HCMUS\\Thesis\\VTM_AgenticRAG_QA\\data\\processed",
+  "index_root": "C:\\Users\\Admin\\OneDrive\\Documents\\HCMUS\\Thesis\\VTM_AgenticRAG_QA\\indexes",
+  "query_count": 693,
+  "corpus_count": 10238,
+  "top_k": 100,
+  "k_values": [
+    1,
+    5,
+    10,
+    100
+  ],
+  "metrics": {
+    "NDCG@1": 0.39826839826839827,
+    "MAP@1": 0.39826839826839827,
+    "Recall@1": 0.39826839826839827,
+    "Precision@1": 0.39826839826839827,
+    "MRR@1": 0.39826839826839827,
+    "NDCG@5": 0.4939478597468803,
+    "MAP@5": 0.4665945165945166,
+    "Recall@5": 0.5757575757575758,
+    "Precision@5": 0.11515151515151517,
+    "MRR@5": 0.4665945165945166,
+    "NDCG@10": 0.5179372228505963,
+    "MAP@10": 0.4763307679974347,
+    "Recall@10": 0.6507936507936508,
+    "Precision@10": 0.06507936507936508,
+    "MRR@10": 0.4763307679974347,
+    "NDCG@100": 0.5479089120460648,
+    "MAP@100": 0.48231836850843424,
+    "Recall@100": 0.7936507936507936,
+    "Precision@100": 0.007936507936507936,
+    "MRR@100": 0.48231836850843424
+  },
+  "configuration": {
+    "k1": 1.5,
+    "b": 0.75,
+    "tokenizer": {
+      "name": "underthesea.word_tokenize",
+      "format": "text",
+      "lowercase": true,
+      "remove_punctuation": false,
+      "remove_stopwords": false
+    }
+  },
+  "fingerprints": {
+    "corpus": "241deefc1bf2c14c787c55e29d7b7d5dbb11647450ff47924611ea6fc296a8f2",
+    "queries": "e4ec3a1e80549cf9044501039a9483873797b10e8774ef1011294e0b100388fc",
+    "qrels": "9704c01768009e618787e16026e2e033e5021556674c6826d62a2dee68208ffe"
+  },
+  "evaluation_policy": {
+    "version": 1,
+    "tie_break": "score_desc_doc_id_asc",
+    "ndcg_gain": "linear",
+    "missing_queries": "zero",
+    "equal_query_document_ids": "retain"
+  },
+  "environment": {
+    "python": "3.13.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "dependencies": {
+      "numpy": "2.5.3",
+      "torch": "2.11.0+cu128",
+      "faiss-cpu": "1.15.1",
+      "sentence-transformers": "6.1.0",
+      "transformers": "5.18.0",
+      "pyvi": "0.1.1",
+      "rank-bm25": "0.2.2",
+      "underthesea": "9.5.0",
+      "underthesea_core": "3.3.2",
+      "datasets": "5.1.0",
+      "huggingface-hub": "1.33.0"
+    }
+  },
+  "truncation": null,
+  "timings": {
+    "prepare_seconds": 18.6087850999902,
+    "cache_reused": true,
+    "index_build_seconds": null,
+    "search_seconds": 44.65239879999717,
+    "queries_per_second": 15.519882887009508,
+    "latency_warmup_queries": 10,
+    "latency_query_count": 693,
+    "latency_mean_ms": 73.0142284270452,
+    "latency_p50_ms": 68.89850000152364,
+    "latency_p95_ms": 120.19217999186365,
+    "prepare_peak_cuda_mib": null,
+    "evaluation_peak_cuda_mib": null
+  },
+  "device": "cpu",
+  "faiss_threads": null,
+  "initial_batch_size": null,
+  "effective_batch_size": null,
+  "oom_retries": []
+}

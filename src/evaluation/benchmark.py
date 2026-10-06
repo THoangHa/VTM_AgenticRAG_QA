@@ -48,7 +48,7 @@ def environment():
 def run_benchmark(data, model_key, *, top_k=100, k_values=(1, 5, 10, 100),
                   results_root=ROOT / "results" / "benchmarks", index_root=ROOT / "indexes",
                   dense_config=None, device="cuda", batch_size=8, rebuild=False,
-                  k1=1.5, b=0.75, adapter_factory=None):
+                  k1=1.5, b=0.75, alpha=0.5, candidate_k=500, adapter_factory=None):
     ks = validate_cutoffs(k_values)
     if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < max(ks):
         raise ValueError("Retrieval depth must be at least the largest metric cutoff.")
@@ -63,8 +63,11 @@ def run_benchmark(data, model_key, *, top_k=100, k_values=(1, 5, 10, 100),
     write_json(path / "status.json", {"status": "running", "model": model_key})
     adapter, r = None, None
     try:
-        from src.evaluation.adapters import BM25Adapter, DenseAdapter
-        if model_key in {"bge_m3", "vi_bi_encoder"} and device == "cuda" and adapter_factory is None:
+        from src.evaluation.adapters import BM25Adapter, DenseAdapter, HybridAdapter, validate_hybrid_parameters
+        if model_key == "hybrid":
+            validate_hybrid_parameters(alpha, candidate_k, top_k)
+        uses_dense = model_key in {"bge_m3", "vi_bi_encoder"} or (model_key == "hybrid" and alpha > 0)
+        if uses_dense and device == "cuda" and adapter_factory is None:
             import torch
             if not torch.cuda.is_available():
                 raise RuntimeError("CUDA is required for this benchmark.")
@@ -74,6 +77,9 @@ def run_benchmark(data, model_key, *, top_k=100, k_values=(1, 5, 10, 100),
             adapter = adapter_factory()
         elif model_key == "bm25":
             adapter = BM25Adapter(data, Path(index_root), rebuild, k1, b)
+        elif model_key == "hybrid":
+            adapter = HybridAdapter(data, Path(index_root), dense_config, rebuild, device,
+                                    batch_size, alpha, candidate_k, k1, b)
         else:
             from src.retrieval.dense.dense_retriever import DEFAULT_CONFIG_PATH
             adapter = DenseAdapter(model_key, data, Path(index_root), dense_config or DEFAULT_CONFIG_PATH,
@@ -114,7 +120,9 @@ def run_benchmark(data, model_key, *, top_k=100, k_values=(1, 5, 10, 100),
             adapter.search({qid: text}, top_k)
             sync()
             latencies.append(time.perf_counter() - started)
-        config = r.configuration if r is not None else {"model": model_key}
+        config = getattr(adapter, "configuration", None)
+        if config is None:
+            config = r.configuration if r is not None else {"model": model_key}
         cache_meta = getattr(r, "index_metadata", {})
         timings = {"prepare_seconds": prepare_seconds, "cache_reused": getattr(adapter, "cache_reused", False),
                    "index_build_seconds": cache_meta.get("build_seconds", None if getattr(adapter, "cache_reused", False) else prepare_seconds),
@@ -125,6 +133,10 @@ def run_benchmark(data, model_key, *, top_k=100, k_values=(1, 5, 10, 100),
                    "latency_p95_ms": float(np.percentile(latencies, 95) * 1000),
                    "prepare_peak_cuda_mib": prepare_peak,
                    "evaluation_peak_cuda_mib": torch.cuda.max_memory_allocated() / 2**20 if cuda else None}
+        if model_key == "hybrid":
+            # Dense historical build time is not the build time of both hybrid components.
+            timings["index_build_seconds"] = None
+            timings["components"] = getattr(adapter, "component_timings", {})
         summary = {"schema_version": 1, "model": model_key, "split": data.split,
                    "data_directory": str(data.directory.resolve()), "index_root": str(Path(index_root).resolve()),
                    "query_count": report.query_count, "corpus_count": len(data.corpus),

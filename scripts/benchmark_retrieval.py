@@ -25,11 +25,15 @@ def main():
         sub.add_argument("--batch-size", type=int, default=8)
         sub.add_argument("--rebuild", action="store_true")
     single = commands.choices["evaluate"]
-    single.add_argument("--model", choices=["bm25", "bge_m3", "vi_bi_encoder"], required=True)
+    single.add_argument("--model", choices=["bm25", "bge_m3", "vi_bi_encoder", "hybrid"], required=True)
     single.add_argument("--split", choices=["val", "test"], default="val")
     single.add_argument("--device", choices=["cuda", "cpu"], default="cuda")
     single.add_argument("--k1", type=float, default=1.5)
     single.add_argument("--b", type=float, default=0.75)
+    single.add_argument("--alpha", type=float, default=None,
+                        help="Hybrid-only dense weight in [0, 1] (default: 0.5).")
+    single.add_argument("--candidate-k", type=int, default=None,
+                        help="Hybrid-only candidates per method before fusion (default: 500).")
     compare = commands.choices["compare-dense"]
     compare.add_argument("--runs", type=Path, nargs=2, help="Compare two completed validation run directories without loading models")
     compare.add_argument("--baseline-path", type=Path, default=ROOT / "configs" / "dense_baseline.yaml")
@@ -39,8 +43,12 @@ def main():
                       index_root=args.index_root, dense_config=args.dense_config,
                       batch_size=args.batch_size, rebuild=args.rebuild)
         if args.command == "evaluate":
+            if args.model != "hybrid" and (args.alpha is not None or args.candidate_k is not None):
+                raise ValueError("--alpha and --candidate-k apply only to --model hybrid.")
             data = load_data(args.data_dir, args.split)
-            run_benchmark(data, args.model, device=args.device, k1=args.k1, b=args.b, **common)
+            run_benchmark(data, args.model, device=args.device, k1=args.k1, b=args.b,
+                          alpha=0.5 if args.alpha is None else args.alpha,
+                          candidate_k=500 if args.candidate_k is None else args.candidate_k, **common)
         else:
             if not {1, 5, 10, 100}.issubset(args.k_values) or args.top_k < 100:
                 raise ValueError("Dense comparison requires cutoffs 1, 5, 10, 100 and depth >= 100.")
