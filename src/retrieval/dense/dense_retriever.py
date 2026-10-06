@@ -12,6 +12,7 @@ import statistics
 import datetime
 import re
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from pathlib import Path
 
 import yaml
@@ -354,17 +355,20 @@ class BaseDenseRetriever(ABC):
         query_emb = self._encode(query)
         query_emb = query_emb.reshape(1, -1)
 
-        # Over-fetch a little so ties at the cutoff are resolved consistently
-        k = min(top_k + 10, self.index.ntotal)
-        scores, idx = self.index.search(query_emb, k)
+        # Score the whole corpus (flat search is exhaustive anyway) so ties are
+        # ordered exactly like BM25Retriever: descending score, then ascending doc_id.
+        scores, idx = self.index.search(query_emb, self.index.ntotal)
+        scores, idx = scores[0], idx[0]
+        valid = idx != -1
+        scores, idx = scores[valid], idx[valid]
 
-        results = []
-        for i, score in zip(idx[0], scores[0]):
-            if i == -1:
-                continue
-            results.append({**self.corpus[i], "score": float(score)})
+        doc_ids = np.asarray(self.doc_ids)[idx]
+        order = np.lexsort((doc_ids, -scores))[:top_k]
 
-        results.sort(key=lambda r: (-r["score"], r["doc_id"]))
-        return results[:top_k]
+        # Independent deep copies, so callers cannot mutate the index's corpus
+        return [
+            dict(deepcopy(self.corpus[idx[j]]), score=float(scores[j]))
+            for j in order
+        ]
     
     
