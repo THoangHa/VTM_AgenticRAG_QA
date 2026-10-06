@@ -14,27 +14,8 @@ import sys
 import traceback
 
 import numpy as np
-from pyvi import ViTokenizer
 
-from src.retrieval.dense.dense_retriever import BaseDenseRetriever
-
-
-# ── Temporary concrete subclasses (only for testing) ─────────────────────────
-class _BGEM3(BaseDenseRetriever):
-    MODEL_KEY = "bge_m3"
-
-    def _prep(self, text):
-        return text
-
-
-class _ViBiEncoder(BaseDenseRetriever):
-    MODEL_KEY = "vi_bi_encoder"
-
-    def _prep(self, text):
-        return ViTokenizer.tokenize(text)
-
-
-TEST_CLASSES = {"bge_m3": _BGEM3, "vi_bi_encoder": _ViBiEncoder}
+MODEL_KEYS = ["bge_m3", "vi_bi_encoder"]
 
 SENTENCES = [
     "Cam thảo có tác dụng gì trong y học cổ truyền?",   # query
@@ -57,6 +38,7 @@ def _emb(out):
 
 # ── Tests (each takes a loaded retriever `r`) ────────────────────────────────
 def test_abstract_base_cannot_be_instantiated(r):
+    from src.retrieval.dense.dense_retriever import BaseDenseRetriever
     try:
         BaseDenseRetriever()
     except TypeError:
@@ -166,7 +148,8 @@ TESTS = [
 # ── Runner ───────────────────────────────────────────────────────────────────
 def run_for_model(key, device):
     print(f"\n=== {key} ===")
-    r = TEST_CLASSES[key](device=device)
+    from src.retrieval.dense.registry import RETRIEVERS
+    r = RETRIEVERS[key](device=device, batch_size=8, require_cuda=device != "cpu")
     print(f"device={r.device}  dim={r.dim}  batch_size={r.batch_size}  index_dir={r.index_dir}")
 
     failed = 0
@@ -183,11 +166,11 @@ def run_for_model(key, device):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=list(TEST_CLASSES), default=None)
+    parser.add_argument("--model", choices=MODEL_KEYS, default=None)
     parser.add_argument("--device", default=None, help="override device, e.g. cpu")
     args = parser.parse_args()
 
-    keys = [args.model] if args.model else list(TEST_CLASSES)
+    keys = [args.model] if args.model else MODEL_KEYS
     total_failed = sum(run_for_model(k, args.device) for k in keys)
 
     print(f"\n{'ALL TESTS PASSED' if total_failed == 0 else f'{total_failed} TEST(S) FAILED'}")

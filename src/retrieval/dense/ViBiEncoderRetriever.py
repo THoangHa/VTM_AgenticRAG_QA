@@ -13,6 +13,7 @@ from src.retrieval.dense.dense_retriever import BaseDenseRetriever
 class ViBiEncoderRetriever(BaseDenseRetriever):
     # Must match the key under `models` in config.yaml
     MODEL_KEY = "vi_bi_encoder"
+    PREPROCESSING = "pyvi_whitespace_collapse_v1"
 
     def _prep(self, text: str) -> str:
         '''

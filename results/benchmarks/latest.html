@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Latest retrieval benchmark</title>
+<style>
+body{margin:0;background:#f3f6fa;color:#192b3c;font:16px/1.65 system-ui,sans-serif}
+main{max-width:1050px;margin:40px auto;padding:0 24px}h1{font-size:32px;line-height:1.25}
+h2{font-size:21px;margin-top:0}section{background:white;padding:24px;border-radius:12px;margin:20px 0}
+.eyebrow{color:#526679;font-size:14px}.winner{border-left:5px solid #167454}
+.table{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:12px;text-align:right;border-bottom:1px solid #e2e8ef}th:first-child{text-align:left}
+.selected{background:#eaf6ef}a{color:#1761a8}li{margin:12px 0;overflow-wrap:anywhere}
+.folder{overflow-wrap:anywhere;font-family:monospace}footer{color:#526679;font-size:14px;margin:24px 0}
+</style></head><body><main>
+<p class="eyebrow">Completed validation comparison</p><h1>Retrieval benchmark results</h1>
+
+<p>693 validation questions · 10,238 passages · depth 100</p>
+<section class="winner"><h2>Selected dense baseline: BGE-M3</h2>
+<p>Higher unrounded NDCG@10; uncertainty is reported separately.</p>
+<p>Current comparison folder:<br><span class="folder">comparison_20261006T160915Z_5372fb1ce3cb</span></p></section>
+<section><h2>Retrieval quality</h2><div class="table"><table>
+<thead><tr><th>Model</th><th>nDCG@10</th><th>Recall@10</th><th>MRR@10</th><th>Recall@100</th></tr></thead>
+<tbody><tr class="selected"><th>BGE-M3</th><td>0.717628</td><td>0.826840</td><td>0.682174</td><td>0.913420</td></tr><tr><th>Vietnamese bi-encoder</th><td>0.623070</td><td>0.733045</td><td>0.587552</td><td>0.841270</td></tr></tbody></table></div>
+<p>The highlighted model is selected using unrounded nDCG@10, then Recall@10 and MRR@10 for exact ties.</p></section>
+<section><h2>Uncertainty</h2><p>BGE-M3 minus Vietnamese encoder nDCG@10:
+<strong>0.094558</strong>.
+Paired 95% confidence interval: [0.071434, 0.117818].</p>
+<p>The interval excludes zero in this paired question-bootstrap analysis. 10,000 resamples; seed 42.</p></section>
+<section><h2>Performance diagnostics</h2><div class="table"><table>
+<thead><tr><th>Model</th><th>Index build (s)</th><th>Queries/s</th><th>p50 latency (ms)</th><th>Peak CUDA (MiB)</th><th>Truncated passages</th></tr></thead>
+<tbody><tr><th>BGE-M3</th><td>60.99</td><td>97.83</td><td>31.43</td><td>2,654.22</td><td>41</td></tr><tr><th>Vietnamese bi-encoder</th><td>37.31</td><td>116.19</td><td>25.85</td><td>618.60</td><td>343</td></tr></tbody></table></div>
+<p>Speed and memory do not affect selection. Cached index build times are historical; CUDA memory measures PyTorch allocations.</p></section>
+<section><h2>Source runs and files</h2><ul><li><strong>BGE-M3</strong>: bge_m3_val_20261006T160741Z_6689c41e4b94 — <a href="bge_m3_val_20261006T160741Z_6689c41e4b94/metrics.json">detailed metrics</a></li><li><strong>Vietnamese bi-encoder</strong>: vi_bi_encoder_val_20261006T160831Z_ebae74e2674b — <a href="vi_bi_encoder_val_20261006T160831Z_ebae74e2674b/metrics.json">detailed metrics</a></li>
+<li><a href="comparison_20261006T160915Z_5372fb1ce3cb/comparison.json">Comparison data (JSON)</a></li>
+<li><a href="comparison_20261006T160915Z_5372fb1ce3cb/selected_baseline.yaml">Frozen model configuration (YAML)</a></li></ul></section>
+<footer>This comparison uses validation only and fixed 512/256 token limits. Labels credit the original source passage.
+Questions sharing passages may be correlated. No test questions were evaluated.</footer>
+</main></body></html>

@@ -1,0 +1,18 @@
+# Install CUDA PyTorch first (see RETRIEVAL_BENCHMARK.md).
+# This subset deliberately excludes the project's LLM/generation dependencies.
+numpy==2.5.3
+scipy==1.18.1
+pytest==9.1.1
+PyYAML==6.0.3
+jsonlines==4.0.0
+loguru==0.7.3
+tqdm==4.70.1
+datasets==5.1.0
+rank-bm25==0.2.2
+underthesea==9.5.0
+underthesea_core==3.3.2
+pyvi==0.1.1
+faiss-cpu==1.15.1
+sentence-transformers==6.1.0
+transformers==5.18.0
+huggingface-hub==1.33.0

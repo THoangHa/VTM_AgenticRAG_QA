@@ -1,0 +1,20 @@
+LATEST COMPLETED DENSE VALIDATION COMPARISON
+
+Comparison folder: comparison_20261006T160915Z_5372fb1ce3cb
+Selected baseline: BGE-M3
+Higher unrounded NDCG@10; uncertainty is reported separately.
+
+Model                       nDCG@10   Recall@10   MRR@10
+BGE-M3                      0.717628  0.826840    0.682174
+Vietnamese bi-encoder       0.623070  0.733045    0.587552
+
+BGE-M3 minus Vietnamese encoder nDCG@10: 0.094558
+Paired 95% confidence interval: [0.07143379824843538, 0.1178180407159929]
+Uncertainty result: a_higher
+
+SOURCE RUN FOLDERS
+BGE-M3: bge_m3_val_20261006T160741Z_6689c41e4b94
+Vietnamese bi-encoder: vi_bi_encoder_val_20261006T160831Z_ebae74e2674b
+
+For formatted tables, double-click latest.html in File Explorer.
+No test questions were evaluated.

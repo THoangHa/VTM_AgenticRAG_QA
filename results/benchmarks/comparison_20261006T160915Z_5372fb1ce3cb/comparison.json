@@ -1,0 +1,25 @@
+{
+  "winner": "bge_m3",
+  "selection_reason": "Higher unrounded NDCG@10; uncertainty is reported separately.",
+  "bootstrap_ndcg10": {
+    "difference_a_minus_b": 0.09455788498972961,
+    "ci95": [
+      0.07143379824843538,
+      0.1178180407159929
+    ],
+    "resamples": 10000,
+    "seed": 42,
+    "method": "paired_percentile",
+    "conclusion": "a_higher"
+  },
+  "runs": {
+    "bge_m3": "C:\\Users\\Admin\\OneDrive\\Documents\\HCMUS\\Thesis\\VTM_AgenticRAG_QA\\results\\benchmarks\\bge_m3_val_20261006T160741Z_6689c41e4b94",
+    "vi_bi_encoder": "C:\\Users\\Admin\\OneDrive\\Documents\\HCMUS\\Thesis\\VTM_AgenticRAG_QA\\results\\benchmarks\\vi_bi_encoder_val_20261006T160831Z_ebae74e2674b"
+  },
+  "fingerprints": {
+    "corpus": "241deefc1bf2c14c787c55e29d7b7d5dbb11647450ff47924611ea6fc296a8f2",
+    "queries": "e4ec3a1e80549cf9044501039a9483873797b10e8774ef1011294e0b100388fc",
+    "qrels": "9704c01768009e618787e16026e2e033e5021556674c6826d62a2dee68208ffe"
+  },
+  "split": "val"
+}

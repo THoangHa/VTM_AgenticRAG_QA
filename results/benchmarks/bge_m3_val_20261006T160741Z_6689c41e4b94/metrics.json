@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "model": "bge_m3",
+  "split": "val",
+  "data_directory": "C:\\Users\\Admin\\OneDrive\\Documents\\HCMUS\\Thesis\\VTM_AgenticRAG_QA\\data\\processed",
+  "index_root": "C:\\Users\\Admin\\OneDrive\\Documents\\HCMUS\\Thesis\\VTM_AgenticRAG_QA\\indexes",
+  "query_count": 693,
+  "corpus_count": 10238,
+  "top_k": 100,
+  "k_values": [
+    1,
+    5,
+    10,
+    100
+  ],
+  "metrics": {
+    "NDCG@1": 0.6017316017316018,
+    "MAP@1": 0.6017316017316018,
+    "Recall@1": 0.6017316017316018,
+    "Precision@1": 0.6017316017316018,
+    "MRR@1": 0.6017316017316018,
+    "NDCG@5": 0.7058511675528096,
+    "MAP@5": 0.6772486772486772,
+    "Recall@5": 0.7907647907647908,
+    "Precision@5": 0.15815295815295816,
+    "MRR@5": 0.6772486772486772,
+    "NDCG@10": 0.7176282663026555,
+    "MAP@10": 0.6821737786023501,
+    "Recall@10": 0.8268398268398268,
+    "Precision@10": 0.08268398268398269,
+    "MRR@10": 0.6821737786023501,
+    "NDCG@100": 0.7357857252713235,
+    "MAP@100": 0.6857874928679832,
+    "Recall@100": 0.9134199134199135,
+    "Precision@100": 0.009134199134199134,
+    "MRR@100": 0.6857874928679832
+  },
+  "configuration": {
+    "model": "bge_m3",
+    "hf_name": "BAAI/bge-m3",
+    "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "dim": 1024,
+    "max_seq_length": 512,
+    "preprocessing": "raw_text_v1",
+    "precision": "float16",
+    "normalization": "l2_float32",
+    "index_type": "IndexFlatIP",
+    "score_function": "cosine",
+    "text_fields": [
+      "text"
+    ]
+  },
+  "fingerprints": {
+    "corpus": "241deefc1bf2c14c787c55e29d7b7d5dbb11647450ff47924611ea6fc296a8f2",
+    "queries": "e4ec3a1e80549cf9044501039a9483873797b10e8774ef1011294e0b100388fc",
+    "qrels": "9704c01768009e618787e16026e2e033e5021556674c6826d62a2dee68208ffe"
+  },
+  "evaluation_policy": {
+    "version": 1,
+    "tie_break": "score_desc_doc_id_asc",
+    "ndcg_gain": "linear",
+    "missing_queries": "zero",
+    "equal_query_document_ids": "retain"
+  },
+  "environment": {
+    "python": "3.13.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "dependencies": {
+      "numpy": "2.5.3",
+      "torch": "2.11.0+cu128",
+      "faiss-cpu": "1.15.1",
+      "sentence-transformers": "6.1.0",
+      "transformers": "5.18.0",
+      "pyvi": "0.1.1",
+      "rank-bm25": "0.2.2",
+      "underthesea": "9.5.0",
+      "underthesea_core": "3.3.2",
+      "datasets": "5.1.0",
+      "huggingface-hub": "1.33.0"
+    },
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "cuda_runtime": "12.8",
+    "gpu_total_memory_mib": 6143.5
+  },
+  "truncation": {
+    "corpus": {
+      "count": 10238,
+      "limit": 512,
+      "includes_special_tokens": true,
+      "truncated_count": 41,
+      "truncated_fraction": 0.004004688415706193,
+      "median_tokens": 98.0,
+      "p95_tokens": 282.14999999999964,
+      "max_tokens": 1407
+    },
+    "queries": {
+      "count": 693,
+      "limit": 512,
+      "includes_special_tokens": true,
+      "truncated_count": 0,
+      "truncated_fraction": 0.0,
+      "median_tokens": 17.0,
+      "p95_tokens": 27.0,
+      "max_tokens": 52
+    }
+  },
+  "timings": {
+    "prepare_seconds": 14.840913299995009,
+    "cache_reused": true,
+    "index_build_seconds": 60.99122239999997,
+    "search_seconds": 7.083549600007245,
+    "queries_per_second": 97.83230712456523,
+    "latency_warmup_queries": 10,
+    "latency_query_count": 693,
+    "latency_mean_ms": 31.90675209238833,
+    "latency_p50_ms": 31.433199997991323,
+    "latency_p95_ms": 37.93664000404533,
+    "prepare_peak_cuda_mib": 2654.2236328125,
+    "evaluation_peak_cuda_mib": 1102.62255859375
+  },
+  "device": "cuda",
+  "faiss_threads": 1,
+  "initial_batch_size": 8,
+  "effective_batch_size": 8,
+  "oom_retries": []
+}

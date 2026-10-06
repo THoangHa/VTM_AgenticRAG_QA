@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "model": "vi_bi_encoder",
+  "split": "val",
+  "data_directory": "C:\\Users\\Admin\\OneDrive\\Documents\\HCMUS\\Thesis\\VTM_AgenticRAG_QA\\data\\processed",
+  "index_root": "C:\\Users\\Admin\\OneDrive\\Documents\\HCMUS\\Thesis\\VTM_AgenticRAG_QA\\indexes",
+  "query_count": 693,
+  "corpus_count": 10238,
+  "top_k": 100,
+  "k_values": [
+    1,
+    5,
+    10,
+    100
+  ],
+  "metrics": {
+    "NDCG@1": 0.5093795093795094,
+    "MAP@1": 0.5093795093795094,
+    "Recall@1": 0.5093795093795094,
+    "Precision@1": 0.5093795093795094,
+    "MRR@1": 0.5093795093795094,
+    "NDCG@5": 0.609782971455542,
+    "MAP@5": 0.581938431938432,
+    "Recall@5": 0.6926406926406926,
+    "Precision@5": 0.13852813852813853,
+    "MRR@5": 0.581938431938432,
+    "NDCG@10": 0.6230703813129259,
+    "MAP@10": 0.5875518220756316,
+    "Recall@10": 0.733044733044733,
+    "Precision@10": 0.07330447330447332,
+    "MRR@10": 0.5875518220756316,
+    "NDCG@100": 0.6447396366810629,
+    "MAP@100": 0.5913787919589307,
+    "Recall@100": 0.8412698412698413,
+    "Precision@100": 0.008412698412698413,
+    "MRR@100": 0.5913787919589307
+  },
+  "configuration": {
+    "model": "vi_bi_encoder",
+    "hf_name": "bkai-foundation-models/vietnamese-bi-encoder",
+    "revision": "84f9d9ada0d1a3c37557398b9ae9fcedcdf40be0",
+    "dim": 768,
+    "max_seq_length": 256,
+    "preprocessing": "pyvi_whitespace_collapse_v1",
+    "precision": "float16",
+    "normalization": "l2_float32",
+    "index_type": "IndexFlatIP",
+    "score_function": "cosine",
+    "text_fields": [
+      "text"
+    ]
+  },
+  "fingerprints": {
+    "corpus": "241deefc1bf2c14c787c55e29d7b7d5dbb11647450ff47924611ea6fc296a8f2",
+    "queries": "e4ec3a1e80549cf9044501039a9483873797b10e8774ef1011294e0b100388fc",
+    "qrels": "9704c01768009e618787e16026e2e033e5021556674c6826d62a2dee68208ffe"
+  },
+  "evaluation_policy": {
+    "version": 1,
+    "tie_break": "score_desc_doc_id_asc",
+    "ndcg_gain": "linear",
+    "missing_queries": "zero",
+    "equal_query_document_ids": "retain"
+  },
+  "environment": {
+    "python": "3.13.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "dependencies": {
+      "numpy": "2.5.3",
+      "torch": "2.11.0+cu128",
+      "faiss-cpu": "1.15.1",
+      "sentence-transformers": "6.1.0",
+      "transformers": "5.18.0",
+      "pyvi": "0.1.1",
+      "rank-bm25": "0.2.2",
+      "underthesea": "9.5.0",
+      "underthesea_core": "3.3.2",
+      "datasets": "5.1.0",
+      "huggingface-hub": "1.33.0"
+    },
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "cuda_runtime": "12.8",
+    "gpu_total_memory_mib": 6143.5
+  },
+  "truncation": {
+    "corpus": {
+      "count": 10238,
+      "limit": 256,
+      "includes_special_tokens": true,
+      "truncated_count": 343,
+      "truncated_fraction": 0.03350263723383473,
+      "median_tokens": 79.0,
+      "p95_tokens": 232.0,
+      "max_tokens": 1190
+    },
+    "queries": {
+      "count": 693,
+      "limit": 256,
+      "includes_special_tokens": true,
+      "truncated_count": 0,
+      "truncated_fraction": 0.0,
+      "median_tokens": 14.0,
+      "p95_tokens": 22.0,
+      "max_tokens": 38
+    }
+  },
+  "timings": {
+    "prepare_seconds": 3.5735745999991195,
+    "cache_reused": true,
+    "index_build_seconds": 37.30553709999367,
+    "search_seconds": 5.9643857999908505,
+    "queries_per_second": 116.18966700662843,
+    "latency_warmup_queries": 10,
+    "latency_query_count": 693,
+    "latency_mean_ms": 26.116919625037475,
+    "latency_p50_ms": 25.851500002318062,
+    "latency_p95_ms": 32.60584000090603,
+    "prepare_peak_cuda_mib": 618.6044921875,
+    "evaluation_peak_cuda_mib": 288.00048828125
+  },
+  "device": "cuda",
+  "faiss_threads": 1,
+  "initial_batch_size": 8,
+  "effective_batch_size": 8,
+  "oom_retries": []
+}

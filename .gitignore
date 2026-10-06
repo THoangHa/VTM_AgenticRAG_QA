@@ -51,3 +51,10 @@ data/processed/
 
 # Keep the BM25 usage guide
 !BM25_BASELINE.md
+!RETRIEVAL_BENCHMARK.md
+
+# Benchmark summaries/configurations are small; per-query artifacts are reproducible.
+results/benchmarks/**/rankings.jsonl
+results/benchmarks/**/per_query.jsonl
+results/benchmarks/**/per_query_differences.jsonl
+!results/benchmarks/**/REPORT.md

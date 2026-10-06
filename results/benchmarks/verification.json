@@ -1,0 +1,59 @@
+{
+  "split": "val",
+  "corpus_count": 10238,
+  "query_count": 693,
+  "selected_model": "bge_m3",
+  "models": {
+    "bge_m3": {
+      "rankings_verified": true,
+      "metrics_verified": true,
+      "index_count": 10238,
+      "real_model_smoke_checks_passed": [
+        "test_abstract_base_cannot_be_instantiated",
+        "test_shape_and_dtype",
+        "test_unit_norm",
+        "test_no_nan_or_inf",
+        "test_semantic_similarity",
+        "test_empty_list",
+        "test_single_string",
+        "test_deterministic",
+        "test_batch_consistency",
+        "test_long_text_is_truncated",
+        "test_prep_is_applied",
+        "test_index_compatible"
+      ],
+      "resolved_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "saved_configuration_load_verified": true
+    },
+    "vi_bi_encoder": {
+      "rankings_verified": true,
+      "metrics_verified": true,
+      "index_count": 10238,
+      "real_model_smoke_checks_passed": [
+        "test_abstract_base_cannot_be_instantiated",
+        "test_shape_and_dtype",
+        "test_unit_norm",
+        "test_no_nan_or_inf",
+        "test_semantic_similarity",
+        "test_empty_list",
+        "test_single_string",
+        "test_deterministic",
+        "test_batch_consistency",
+        "test_long_text_is_truncated",
+        "test_prep_is_applied",
+        "test_index_compatible"
+      ],
+      "resolved_revision": "84f9d9ada0d1a3c37557398b9ae9fcedcdf40be0",
+      "saved_configuration_load_verified": false
+    }
+  },
+  "network": "disabled",
+  "bootstrap_verified": true,
+  "passed": true,
+  "comparison": "comparison_20261006T160915Z_5372fb1ce3cb",
+  "verified_at_utc": "2026-10-06T16:37:46.056820+00:00",
+  "offline_tests": {
+    "passed": 94,
+    "skipped_real_model_tests": 24
+  }
+}

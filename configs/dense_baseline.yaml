@@ -1,0 +1,46 @@
+baseline_model: bge_m3
+selection:
+  split: val
+  metric: NDCG@10
+  source_run: ..\results\benchmarks\bge_m3_val_20261006T160741Z_6689c41e4b94
+  comparison: ..\results\benchmarks\comparison_20261006T160915Z_5372fb1ce3cb
+  fingerprints:
+    corpus: 241deefc1bf2c14c787c55e29d7b7d5dbb11647450ff47924611ea6fc296a8f2
+    queries: e4ec3a1e80549cf9044501039a9483873797b10e8774ef1011294e0b100388fc
+    qrels: 9704c01768009e618787e16026e2e033e5021556674c6826d62a2dee68208ffe
+  evaluation_policy:
+    version: 1
+    tie_break: score_desc_doc_id_asc
+    ndcg_gain: linear
+    missing_queries: zero
+    equal_query_document_ids: retain
+paths:
+  corpus: ..\data\processed\corpus.jsonl
+  data_dir: ..\data\processed
+  index_root: ..\indexes
+  results_dir: ..\results\benchmarks
+defaults:
+  device: cuda
+  fp16: true
+  batch_size: 8
+  top_k: 100
+models:
+  bge_m3:
+    hf_name: BAAI/bge-m3
+    revision: 5617a9f61b028005a4858fdac845db406aefb181
+    max_seq_length: 512
+    dim: 1024
+    batch_size: 8
+encoding:
+  model: bge_m3
+  hf_name: BAAI/bge-m3
+  revision: 5617a9f61b028005a4858fdac845db406aefb181
+  dim: 1024
+  max_seq_length: 512
+  preprocessing: raw_text_v1
+  precision: float16
+  normalization: l2_float32
+  index_type: IndexFlatIP
+  score_function: cosine
+  text_fields:
+  - text

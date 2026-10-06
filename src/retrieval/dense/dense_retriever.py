@@ -1,374 +1,269 @@
-'''
-Encode all corpus documents and test queries into embeddings
-'''
-
-import os
-import argparse
-import hashlib
-import json
-import math
-import time
-import statistics
-import datetime
-import re
+"""Dense encoding, exact search, and validated model-specific index caches."""
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from datetime import datetime, timezone
+import gc
+import hashlib
+from importlib.metadata import version
+import json
+import os
+import re
 from pathlib import Path
+import tempfile
+import time
 
-import yaml
-import jsonlines
-from loguru import logger
-
-from sentence_transformers import SentenceTransformer
-import torch
 import faiss
 import numpy as np
-
-from pyvi import ViTokenizer
+import yaml
+from loguru import logger
+from src.evaluation.benchmark_data import ROOT, corpus_fingerprint, read_jsonl, validate_corpus
 
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "config.yaml"
+CACHE_SCHEMA = 2
+
+
+class DenseCacheMismatchError(ValueError):
+    """Readable index belongs to different inputs or encoding settings."""
+
+
+class DenseCacheReadError(ValueError):
+    """Corrupt/incomplete index; explicit --rebuild is required."""
 
 
 def load_config(path=None):
-    '''
-    Load configuration
-    '''
-    path = path or DEFAULT_CONFIG_PATH
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    else:
-        raise FileNotFoundError(f"Config not found: {path}")
+    with Path(path or DEFAULT_CONFIG_PATH).open(encoding="utf-8") as stream:
+        return yaml.safe_load(stream)
+
+
+def file_digest(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 class BaseDenseRetriever(ABC):
-    # Class attribute, match MODEL_KEY of a retriever subclass
     MODEL_KEY = None
+    PREPROCESSING = "raw_text_v1"
 
-    def __init__(self, config_path=DEFAULT_CONFIG_PATH, device=None):
-        '''
-        Load Configuration
-
-        Read model settings, merge defaults, resolve paths,
-        load sentence transformer, set max_seq_length, call .half()
-        '''
-        config_path = Path(config_path or DEFAULT_CONFIG_PATH)
-
-        # Load config
-        try:
-            self.config = load_config(config_path)
-        except yaml.YAMLError as e:
-            raise ValueError(f"Failed to load config: {e}")
-
-        # Validate MODEL_KEY
+    def __init__(self, config_path=DEFAULT_CONFIG_PATH, device=None, batch_size=None,
+                 require_cuda=False, model=None, resolved_revision=None):
+        """Injected encoder/revision permit offline tests without model downloads."""
+        import torch
+        config_path = Path(config_path or DEFAULT_CONFIG_PATH).resolve()
+        self.config = load_config(config_path)
         models = self.config.get("models", {})
-        model_cfg = models.get(self.MODEL_KEY)
-        if not model_cfg:
-            raise ValueError(
-                f"Model config not found for {self.MODEL_KEY!r}. "
-                f"Valid keys: {list(models)}"
-            )
-
-        # Model settings 
+        if self.MODEL_KEY not in models:
+            raise ValueError(f"Unknown model {self.MODEL_KEY!r}; configured keys: {list(models)}")
+        self.spec = models[self.MODEL_KEY]
         defaults = self.config["defaults"]
-        self.spec = model_cfg
-        self.hf_name = self.spec["hf_name"]
+        self.hf_name, self.dim = self.spec["hf_name"], self.spec["dim"]
         self.max_seq_length = self.spec["max_seq_length"]
-        self.dim = self.spec["dim"]
-
-        self.batch_size = self.spec.get("batch_size", defaults["batch_size"])
-        self.top_k = defaults["top_k"]
-        self.fp16 = defaults["fp16"]
-
-        # Device
-        requested = device or defaults["device"]
-        if requested == "cuda" and not torch.cuda.is_available():
-            logger.warning("CUDA requested but not available, falling back to CPU")
-            requested = "cpu"
-        self.device = requested
-
-        # Resolve paths 
-        paths = self.config["paths"]
-        config_dir = config_path.parent
-        self.corpus_path = (config_dir / paths["corpus"]).resolve()
-        self.data_dir = (config_dir / paths["data_dir"]).resolve()
-        self.index_root = (config_dir / paths["index_root"]).resolve()
-        self.results_root = (config_dir / paths["results_dir"]).resolve()
-
+        self.batch_size = batch_size if batch_size is not None else self.spec.get("batch_size", defaults["batch_size"])
+        if isinstance(self.batch_size, bool) or not isinstance(self.batch_size, int) or self.batch_size <= 0:
+            raise ValueError("batch_size must be a positive integer")
+        self.initial_batch_size = self.batch_size
+        self.top_k, self.device = defaults["top_k"], device or defaults["device"]
+        if self.device == "cuda" and not torch.cuda.is_available():
+            if require_cuda:
+                raise RuntimeError("CUDA is required. Install CUDA-enabled PyTorch.")
+            logger.warning("CUDA unavailable; using CPU for this non-strict retriever")
+            self.device = "cpu"
+        self.fp16 = bool(defaults["fp16"] and self.device == "cuda")
+        self.oom_retries = []
+        for attr, key in (("corpus_path", "corpus"), ("data_dir", "data_dir"),
+                          ("index_root", "index_root"), ("results_root", "results_dir")):
+            setattr(self, attr, (config_path.parent / self.config["paths"][key]).resolve())
         self.index_dir = self.index_root / f"dense_{self.MODEL_KEY}"
         self.results_dir = self.results_root / f"dense_{self.MODEL_KEY}"
-
-        # Load model
-        logger.info(f"Loading {self.hf_name} on {self.device} ...")
-        self.model = SentenceTransformer(self.hf_name, device=self.device)
+        if model is None:
+            from huggingface_hub import HfApi
+            from sentence_transformers import SentenceTransformer
+            revision = resolved_revision or self.spec.get("revision") or "main"
+            # A frozen commit can be loaded from the local snapshot without a Hub lookup.
+            self.resolved_revision = (revision if re.fullmatch(r"[0-9a-f]{40}", revision)
+                                      else HfApi().model_info(self.hf_name, revision=revision).sha)
+            logger.info(f"Loading {self.hf_name}@{self.resolved_revision} on {self.device}")
+            self.model = SentenceTransformer(self.hf_name, revision=self.resolved_revision,
+                device=self.device, cache_folder=str(ROOT / ".cache" / "models"))
+        else:
+            if not resolved_revision:
+                raise ValueError("Injected encoders require a resolved_revision.")
+            self.model, self.resolved_revision = model, resolved_revision
         self.model.max_seq_length = self.max_seq_length
-        if self.fp16 and self.device == "cuda":
+        if self.fp16:
             self.model.half()
-
-        # Validate embedding dimension
-        actual_dim = self.model.get_sentence_embedding_dimension()
-        if actual_dim != self.dim:
-            raise ValueError(
-                f"Dimension mismatch for {self.MODEL_KEY}: "
-                f"config says {self.dim}, model gives {actual_dim}"
-            )
-
-        # Index state 
-        self.index = None
-        self.doc_ids = []
-        self.corpus = []  # full corpus records, in index-row order
+        self.model.eval()
+        if self.model.get_sentence_embedding_dimension() != self.dim:
+            raise ValueError("Configured embedding dimension differs from encoder dimension.")
+        self.index, self.corpus, self.doc_ids, self.index_metadata = None, [], [], {}
 
     @abstractmethod
     def _prep(self, text: str) -> str:
-        '''
-        Model-specific text preprocessing, applied to passages and queries.
-        '''
         raise NotImplementedError
 
+    @property
+    def configuration(self):
+        return {"model": self.MODEL_KEY, "hf_name": self.hf_name, "revision": self.resolved_revision,
+                "dim": self.dim, "max_seq_length": self.max_seq_length, "preprocessing": self.PREPROCESSING,
+                "precision": "float16" if self.fp16 else "float32", "normalization": "l2_float32",
+                "index_type": "IndexFlatIP", "score_function": "cosine", "text_fields": ["text"]}
+
+    def dependency_versions(self):
+        names = ["numpy", "faiss-cpu", "torch", "sentence-transformers", "transformers", "huggingface-hub"]
+        if self.PREPROCESSING != "raw_text_v1":
+            names.append("pyvi")
+        return {name: version(name) for name in names}
+
     def _encode(self, texts, show_progress=False):
-        # Wrap texts into a list
-        if isinstance(texts, str):
-            texts = [texts]
-            wrap = True
-        else:
-            wrap = False
-
-        # Check empty lists
-        texts = list(texts)
+        import torch
+        single = isinstance(texts, str)
+        texts = [texts] if single else list(texts)
         if not texts:
-            return np.empty((0, self.dim), dtype=np.float32)  # empty float32 array
+            return np.empty((0, self.dim), dtype=np.float32)
+        if any(not isinstance(t, str) for t in texts):
+            raise TypeError("Encoding inputs must be strings.")
+        prepared = [self._prep(t) for t in texts]
+        while True:
+            try:
+                embeddings = self.model.encode(prepared, batch_size=self.batch_size,
+                    show_progress_bar=show_progress, convert_to_numpy=True,
+                    convert_to_tensor=False, normalize_embeddings=False, device=self.device)
+                break
+            except RuntimeError as exc:
+                is_oom = isinstance(exc, torch.cuda.OutOfMemoryError) or "out of memory" in str(exc).lower()
+                if self.device != "cuda" or not is_oom:
+                    raise
+                if self.batch_size == 1:
+                    raise RuntimeError("CUDA out of memory at batch size 1; encoding cannot continue.") from exc
+                next_batch = max(1, self.batch_size // 2)
+                self.oom_retries.append({"input_count": len(texts), "from_batch": self.batch_size, "to_batch": next_batch})
+                logger.warning(f"CUDA OOM: restarting encoding with batch size {next_batch}")
+                self.batch_size = next_batch
+            # Exit the handler to release exception frames and partial outputs.
+            gc.collect()
+            torch.cuda.empty_cache()
+        embeddings = np.asarray(embeddings, dtype=np.float32)
+        if embeddings.shape != (len(texts), self.dim) or not np.isfinite(embeddings).all():
+            raise ValueError("Encoder returned invalid shape or nonfinite embeddings.")
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        if not np.isfinite(norms).all() or np.any(norms == 0):
+            raise ValueError("Encoder returned zero-norm or invalid embeddings.")
+        embeddings = np.ascontiguousarray(embeddings / norms, dtype=np.float32)
+        return embeddings[0] if single else embeddings
 
-        # Preprocess
-        texts = [self._prep(t) for t in texts]
+    def audit_lengths(self, texts):
+        """Actual tokenizer lengths, without truncation, after preprocessing."""
+        texts, lengths = list(texts), []
+        for start in range(0, len(texts), 128):
+            encoded = self.model.tokenizer([self._prep(t) for t in texts[start:start + 128]],
+                add_special_tokens=True, padding=False, truncation=False)
+            lengths.extend(len(ids) for ids in encoded["input_ids"])
+        array = np.asarray(lengths)
+        return {"count": len(lengths), "limit": self.max_seq_length, "includes_special_tokens": True,
+                "truncated_count": int((array > self.max_seq_length).sum()),
+                "truncated_fraction": float((array > self.max_seq_length).mean()) if len(array) else 0.0,
+                "median_tokens": float(np.median(array)) if len(array) else 0.0,
+                "p95_tokens": float(np.percentile(array, 95)) if len(array) else 0.0,
+                "max_tokens": int(array.max()) if len(array) else 0}
 
-        # Batch encode with progress
-        embeddings = self.model.encode(
-            texts,
-            batch_size=self.batch_size,
-            show_progress_bar=show_progress,
-            convert_to_numpy=True,  # must be numpy for faiss
-            convert_to_tensor=False,
-            normalize_embeddings=False,  # normalized manually below
-            device=self.device if self.device != "cuda" else None  # None = use model.device
-        )
-
-        if embeddings.dtype != np.float32:
-            embeddings = embeddings.astype(np.float32)
-
-        # L2 normalize all embeddings
-        norm = np.linalg.norm(embeddings, axis=1, keepdims=True)
-        # Avoid division by zero
-        norm = np.where(norm == 0, 1.0, norm)
-        embeddings = embeddings / norm
-
-        # Return to user
-        if wrap:
-            return embeddings[0]
-        return embeddings
-
-    @staticmethod
-    def _fingerprint(records):
-        '''
-        SHA-256 over the ordered [doc_id, text] pairs. Detects changed text,
-        ids or order between the index and the corpus.
-        '''
-        payload = json.dumps(
-            [[r["doc_id"], r["text"]] for r in records], ensure_ascii=False
-        )
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    _fingerprint = staticmethod(corpus_fingerprint)
 
     def _load_corpus(self):
-        '''
-        Read corpus.jsonl and return the full records (list of dicts).
-        Validates: file exists, not empty, valid doc_id, non-blank text,
-        unique doc_ids.
-        '''
-        if not Path(self.corpus_path).exists():
-            raise FileNotFoundError(
-                f"Corpus not found: {self.corpus_path}. "
-                "Run `python -m src.data.data_processing` first."
-            )
-
-        with jsonlines.open(self.corpus_path, 'r') as f:
-            records = list(f)
-
-        if not records:
-            raise ValueError(f"Corpus is empty: {self.corpus_path}")
-
-        seen = set()
-        for n, r in enumerate(records, 1):
-            doc_id, text = r.get("doc_id"), r.get("text")
-            if not isinstance(doc_id, str) or not doc_id:
-                raise ValueError(f"Corpus line {n}: missing or invalid 'doc_id'")
-            if not isinstance(text, str) or not text.strip():
-                raise ValueError(f"Corpus line {n} (doc_id={doc_id}): blank or missing 'text'")
-            if doc_id in seen:
-                raise ValueError(f"Corpus line {n}: duplicate doc_id {doc_id}")
-            seen.add(doc_id)
-
-        return records
+        corpus = read_jsonl(self.corpus_path)
+        validate_corpus(corpus)
+        return corpus
 
     def build_index(self):
-        start = time.perf_counter()
+        started = time.perf_counter()
         corpus = self._load_corpus()
-        texts = [d['text'] for d in corpus]
-
-        embs = self._encode(texts, show_progress=True)
-
-        if (embs.shape == (len(corpus), self.dim)):
-            logger.info("Embeddings shape matches the number of documents and dimension")
-        else:
-            raise ValueError("Embeddings shape does not match the number of documents and dimension")
-
+        vectors = self._encode([doc["text"] for doc in corpus], show_progress=True)
         index = faiss.IndexFlatIP(self.dim)
-        index.add(embs)
-
-        if (index.ntotal == len(corpus)):
-            logger.info("Index built successfully")
-        else:
-            raise ValueError("Index not built successfully")
-
-        self.index = index
-        self.corpus = corpus
-        self.doc_ids = [d['doc_id'] for d in corpus]
-
-        self._save(build_seconds=time.perf_counter() - start)
+        index.add(vectors)
+        self.index, self.corpus = index, corpus
+        self.doc_ids = [doc["doc_id"] for doc in corpus]
+        self._save(time.perf_counter() - started)
 
     def _save(self, build_seconds=None):
-        # Create directory if not exists 
-        os.makedirs(self.index_dir, exist_ok=True)
-
-        faiss.write_index(self.index, str(self.index_dir / "index.faiss"))
-
-        # The corpus snapshot, in index-row order, so row i in FAISS maps to record i.
-        with open(self.index_dir / "corpus_snapshot.jsonl", "w", encoding="utf-8") as f:
-            for record in self.corpus:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-        # meta.json is written last: a crash before this leaves an index that
-        # load_index() refuses to load.
-        meta = {
-            "model": self.MODEL_KEY,
-            "hf_name": self.hf_name,
-            "dim": self.dim,
-            "batch_size": self.batch_size,  # informational only
-            "max_seq_length": self.max_seq_length,
-            "fp16": self.fp16,
-            "ntotal": int(self.index.ntotal),
-            "n_docs": len(self.corpus),
-            "index_type": type(self.index).__name__,
-            "corpus_fingerprint": self._fingerprint(self.corpus),
-            "built_at": datetime.datetime.now().isoformat(),
-            "build_seconds": build_seconds,
-        }
-        with open(self.index_dir / "meta.json", "w", encoding="utf-8") as f:
-            json.dump(meta, f, indent=2, ensure_ascii=False)
-
-        logger.info(f"Index saved to {self.index_dir}")
+        self.index_dir.mkdir(parents=True, exist_ok=True)
+        # Stage files; checksum checks reject a crash between replacements.
+        with tempfile.TemporaryDirectory(dir=self.index_dir) as staging:
+            stage = Path(staging)
+            faiss.write_index(self.index, str(stage / "index.faiss"))
+            with (stage / "corpus_snapshot.jsonl").open("w", encoding="utf-8") as stream:
+                for doc in self.corpus:
+                    stream.write(json.dumps(doc, ensure_ascii=False) + "\n")
+            meta = {"schema_version": CACHE_SCHEMA, "configuration": self.configuration,
+                    "dependency_versions": self.dependency_versions(), "n_docs": len(self.corpus),
+                    "corpus_fingerprint": self._fingerprint(self.corpus),
+                    "index_sha256": file_digest(stage / "index.faiss"),
+                    "built_at": datetime.now(timezone.utc).isoformat(), "build_seconds": build_seconds,
+                    "effective_batch_size": self.batch_size}
+            (stage / "meta.json").write_text(json.dumps(meta, indent=2, allow_nan=False), encoding="utf-8")
+            for name in ("index.faiss", "corpus_snapshot.jsonl", "meta.json"):
+                os.replace(stage / name, self.index_dir / name)
+        self.index_metadata = meta
 
     def load_index(self):
-        required = ["index.faiss", "corpus_snapshot.jsonl", "meta.json"]
-
-        # Check if all required files exist
-        missing = [f for f in required if not (self.index_dir / f).exists()]
-        if missing:
-            raise FileNotFoundError(
-                f"Missing index files in {self.index_dir}: {missing}. "
-                "Build the index first."
-            )
-
-        # Compare metadata with current configuration
-        with open(self.index_dir / "meta.json", "r", encoding="utf-8") as f:
-            meta = json.load(f)
-
-        expected = {
-            "model": self.MODEL_KEY,
-            "hf_name": self.hf_name,
-            "dim": self.dim,
-            "max_seq_length": self.max_seq_length,
-        }
-        for key, value in expected.items():
-            if meta.get(key) != value:
-                raise ValueError(
-                    f"Index/config mismatch on '{key}': index has {meta.get(key)!r}, "
-                    f"config has {value!r}. Rebuild the index."
-                )
-        # fp16 slightly changes embeddings but does not invalidate the index
-        if meta.get("fp16") != self.fp16:
-            logger.warning(
-                f"fp16 differs: index built with {meta.get('fp16')}, config has {self.fp16}"
-            )
-
-        # Load index and corpus snapshot
+        if not self.index_dir.exists():
+            raise FileNotFoundError(f"No index in {self.index_dir}")
         try:
+            meta = json.loads((self.index_dir / "meta.json").read_text(encoding="utf-8"))
+            if not isinstance(meta, dict):
+                raise ValueError("Metadata must be a dictionary.")
+        except Exception as exc:
+            raise DenseCacheReadError("Unreadable index metadata; use --rebuild.") from exc
+        if meta.get("schema_version") != CACHE_SCHEMA:
+            raise DenseCacheMismatchError("Index schema changed; rebuild required.")
+        try:
+            snapshot = read_jsonl(self.index_dir / "corpus_snapshot.jsonl")
+            validate_corpus(snapshot)
             index = faiss.read_index(str(self.index_dir / "index.faiss"))
-            with open(self.index_dir / "corpus_snapshot.jsonl", "r", encoding="utf-8") as f:
-                snapshot = [json.loads(line) for line in f if line.strip()]
-        except Exception as e:
-            logger.error(f"Failed to load index: {e}")
-            raise
+            saved_dim = meta["configuration"]["dim"]
+            if (type(index).__name__ != "IndexFlatIP" or index.d != saved_dim
+                    or index.ntotal != len(snapshot) or len(snapshot) != meta["n_docs"]
+                    or self._fingerprint(snapshot) != meta["corpus_fingerprint"]
+                    or file_digest(self.index_dir / "index.faiss") != meta["index_sha256"]):
+                raise ValueError("Index dimensions, counts, snapshot, or checksum are inconsistent.")
+            vectors = index.reconstruct_n(0, index.ntotal)
+            if (not np.isfinite(vectors).all()
+                    or not np.allclose(np.linalg.norm(vectors, axis=1), 1, atol=1e-4)):
+                raise ValueError("Index vectors must be finite and normalized.")
+        except Exception as exc:
+            raise DenseCacheReadError("Corrupt/incomplete dense index; use --rebuild.") from exc
+        if (meta.get("configuration") != self.configuration
+                or meta.get("dependency_versions") != self.dependency_versions()
+                or meta["corpus_fingerprint"] != self._fingerprint(self._load_corpus())):
+            raise DenseCacheMismatchError("Corpus or encoding configuration changed; rebuild required.")
+        self.index, self.corpus = index, snapshot
+        self.doc_ids = [doc["doc_id"] for doc in snapshot]
+        self.index_metadata = meta
 
-        if meta.get("index_type") != type(index).__name__:
-            raise ValueError(
-                f"Index type mismatch: meta says {meta.get('index_type')}, "
-                f"loaded {type(index).__name__}"
-            )
-        if not (index.ntotal == len(snapshot) == meta["ntotal"] == meta["n_docs"]):
-            raise ValueError(
-                f"Count mismatch: index={index.ntotal}, snapshot={len(snapshot)}, "
-                f"meta={meta['ntotal']}/{meta['n_docs']}. Rebuild the index."
-            )
-        if self._fingerprint(snapshot) != meta["corpus_fingerprint"]:
-            raise ValueError("Corpus snapshot is corrupted (fingerprint mismatch). Rebuild the index.")
-
-        self.index = index
-        self.corpus = snapshot
-        self.doc_ids = [d["doc_id"] for d in snapshot]
-        logger.info(f"Index loaded from {self.index_dir} ({index.ntotal:,} vectors)")
-
-        # Warn (do not fail) if corpus.jsonl changed since the index was built
-        try:
-            if self._fingerprint(self._load_corpus()) != meta["corpus_fingerprint"]:
-                logger.warning(
-                    "corpus.jsonl has changed since this index was built; "
-                    "rebuild the index to use the new corpus."
-                )
-        except Exception as e:
-            logger.warning(f"Could not compare the index with the current corpus file: {e}")
-
-    def retrieve(self, query, top_k=10):
-        '''
-        Return up to top_k corpus records (dicts) with an added "score",
-        best first. Ties are broken by ascending doc_id.
-        '''
+    def retrieve_many(self, queries, top_k=10):
         if self.index is None:
-            raise RuntimeError("Index not ready: call build_index() or load_index() first")
-
-        if not isinstance(query, str):
-            raise TypeError("query must be a string")
+            raise RuntimeError("Index not ready: build_index() or load_index() first.")
         if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
             raise ValueError("top_k must be a positive integer")
+        queries = list(queries)
+        if any(not isinstance(q, str) for q in queries):
+            raise TypeError("query must be a string")
+        outputs = [[] for _ in queries]
+        active = [i for i, q in enumerate(queries) if q.strip()]
+        if not active:
+            return outputs
+        vectors = self._encode([queries[i] for i in active])
+        ids = np.asarray(self.doc_ids)
+        # Bound score buffers; exhaustive search also gives stable cutoff ties.
+        for start in range(0, len(active), 32):
+            scores, indices = self.index.search(vectors[start:start + 32], self.index.ntotal)
+            for offset, (row_scores, row_indices) in enumerate(zip(scores, indices)):
+                if not np.isfinite(row_scores).all():
+                    raise ValueError("Nonfinite retrieval scores.")
+                order = np.lexsort((ids[row_indices], -row_scores))[:top_k]
+                outputs[active[start + offset]] = [
+                    dict(deepcopy(self.corpus[row_indices[j]]), score=float(row_scores[j])) for j in order]
+        return outputs
 
-        if not query.strip():
-            return []
-
-        query_emb = self._encode(query)
-        query_emb = query_emb.reshape(1, -1)
-
-        # Score the whole corpus (flat search is exhaustive anyway) so ties are
-        # ordered exactly like BM25Retriever: descending score, then ascending doc_id.
-        scores, idx = self.index.search(query_emb, self.index.ntotal)
-        scores, idx = scores[0], idx[0]
-        valid = idx != -1
-        scores, idx = scores[valid], idx[valid]
-
-        doc_ids = np.asarray(self.doc_ids)[idx]
-        order = np.lexsort((doc_ids, -scores))[:top_k]
-
-        # Independent deep copies, so callers cannot mutate the index's corpus
-        return [
-            dict(deepcopy(self.corpus[idx[j]]), score=float(scores[j]))
-            for j in order
-        ]
-    
-    
+    def retrieve(self, query, top_k=10):
+        return self.retrieve_many([query], top_k)[0]

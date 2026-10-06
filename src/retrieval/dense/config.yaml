@@ -13,18 +13,20 @@ paths:
 defaults:
   device: cuda
   fp16: true # call model.half() on CUDA
-  batch_size: 32
-  top_k: 10
+  batch_size: 8
+  top_k: 100
 
 models:
   bge_m3:
     hf_name: BAAI/bge-m3
+    revision: 5617a9f61b028005a4858fdac845db406aefb181
     max_seq_length: 512
     dim: 1024
-    batch_size: 32 # optional per-model override of defaults.batch_size
+    batch_size: 8
 
   vi_bi_encoder:
     hf_name: bkai-foundation-models/vietnamese-bi-encoder
+    revision: 84f9d9ada0d1a3c37557398b9ae9fcedcdf40be0
     max_seq_length: 256
     dim: 768
-    batch_size: 64
+    batch_size: 8
