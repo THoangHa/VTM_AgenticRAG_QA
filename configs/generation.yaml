@@ -1,0 +1,30 @@
+model:
+  name_or_path: Qwen/Qwen3.5-4B
+  revision: main
+  quantization: nf4
+  compute_dtype: float16
+  double_quantization: true
+  device: cuda
+
+generation:
+  do_sample: false
+  enable_thinking: false
+  max_new_tokens: 256
+
+prompt:
+  version: vi_qa_v1
+  answer_style: concise
+  max_context_docs: 5
+  max_input_tokens: 2048
+
+evaluation:
+  normalization: vi_unicode_v1
+  metrics: [exact_match, f1_token, rouge_l]
+  cleanup_version: cl_v1
+
+run:
+  seed: 42
+  batch_size: 1
+  checkpoint_every: 1
+  fail_on_error: true
+  oom_retry: 1
